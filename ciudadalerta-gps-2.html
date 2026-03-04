@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>CiudadAlerta — Reportes en Tiempo Real</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:#04060d;--surface:#0a0e1a;--surface2:#111827;--surface3:#1a2236;--surface4:#212d42;
+  --border:rgba(255,255,255,.06);--border2:rgba(255,255,255,.11);--border3:rgba(255,255,255,.18);
+  --text:#edf0f7;--text2:#7c8899;--text3:#3d4a5c;
+  --accent:#ff3b3b;--accent2:#ff6b6b;--green:#22c55e;--yellow:#f0b429;--blue:#3b82f6;--purple:#a855f7;
+  --glow:rgba(255,59,59,.2);--glow2:rgba(255,59,59,.08);
+  --radius:12px;--radius-sm:8px;--radius-lg:16px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
+button{font-family:'DM Sans',sans-serif;cursor:pointer;border:none;outline:none}
+input,select,textarea{font-family:'DM Sans',sans-serif;outline:none}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--surface4);border-radius:3px}
+::-webkit-scrollbar-track{background:transparent}
+
+#app{display:grid;grid-template-rows:58px 1fr;grid-template-columns:268px 1fr 318px;height:100vh}
+
+/* TOPBAR */
+#topbar{
+  grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;
+  background:linear-gradient(180deg,rgba(10,14,26,1) 0%,rgba(10,14,26,.97) 100%);
+  border-bottom:1px solid var(--border2);
+  z-index:900;position:relative;
+  backdrop-filter:blur(20px);
+  box-shadow:0 1px 0 rgba(255,255,255,.04), 0 4px 24px rgba(0,0,0,.4);
+}
+.logo{display:flex;align-items:center;gap:11px}
+.logo-mark{
+  width:32px;height:32px;
+  background:linear-gradient(135deg,var(--accent),#c00);
+  border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;
+  box-shadow:0 0 20px var(--glow),0 2px 8px rgba(255,59,59,.4);
+  position:relative;
+}
+.logo-mark::after{content:'';position:absolute;inset:0;border-radius:9px;border:1px solid rgba(255,255,255,.15);}
+.logo-name{font-family:'Syne',sans-serif;font-size:1.08rem;font-weight:800;letter-spacing:-.02em}
+.logo-name span{color:var(--accent)}
+.divider{width:1px;height:20px;background:var(--border2);margin:0 12px}
+.live-pill{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(34,197,94,.07);
+  border:1px solid rgba(34,197,94,.2);
+  border-radius:20px;padding:4px 12px;font-size:.71rem;font-weight:500;color:rgba(34,197,94,.9);
+  letter-spacing:.01em;
+}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.6)}50%{box-shadow:0 0 0 5px rgba(34,197,94,0)}}
+.topbar-nav{position:absolute;left:50%;transform:translateX(-50%);display:flex;gap:2px;background:var(--surface2);border:1px solid var(--border);border-radius:22px;padding:3px}
+.nav-btn{padding:5px 15px;border-radius:18px;font-size:.77rem;font-weight:500;color:var(--text2);background:transparent;border:none;transition:all .22s;letter-spacing:.005em}
+.nav-btn:hover{color:var(--text)}
+.nav-btn.on{color:var(--text);background:var(--surface3);box-shadow:0 1px 6px rgba(0,0,0,.35)}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.btn-report{
+  display:flex;align-items:center;gap:8px;
+  background:linear-gradient(135deg,var(--accent),#cc2020);
+  color:#fff;padding:8px 18px;border-radius:var(--radius-sm);
+  font-size:.8rem;font-weight:600;letter-spacing:.01em;
+  box-shadow:0 0 20px var(--glow),0 4px 12px rgba(255,59,59,.35);
+  transition:all .22s;position:relative;overflow:hidden;
+}
+.btn-report::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.1),transparent);pointer-events:none}
+.btn-report:hover{transform:translateY(-1px);box-shadow:0 0 28px var(--glow),0 6px 16px rgba(255,59,59,.4)}
+.btn-report:active{transform:translateY(0)}
+.avatar{
+  width:32px;height:32px;border-radius:50%;
+  background:linear-gradient(135deg,#ff6b35,#a855f7);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.68rem;font-weight:700;
+  box-shadow:0 0 12px rgba(168,85,247,.3);
+  border:1.5px solid rgba(255,255,255,.12);
+}
+
+/* SIDEBAR */
+#sidebar{
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:inset -1px 0 0 rgba(255,255,255,.03);
+}
+.sb-sec{padding:14px 14px 12px;border-bottom:1px solid var(--border)}
+.sb-ttl{
+  font-size:.6rem;font-weight:600;color:var(--text3);
+  letter-spacing:1.6px;text-transform:uppercase;margin-bottom:10px;
+  display:flex;align-items:center;gap:6px;
+}
+.sb-ttl::after{content:'';flex:1;height:1px;background:var(--border)}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.sc{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:11px 12px;
+  position:relative;overflow:hidden;transition:border-color .2s,transform .15s;
+}
+.sc:hover{border-color:var(--border2);transform:translateY(-1px)}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:currentColor;opacity:.15;border-radius:var(--radius-sm) var(--radius-sm) 0 0}
+.sn{font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;line-height:1;margin-bottom:3px;letter-spacing:-.03em}
+.sl{font-size:.63rem;color:var(--text3);font-weight:500;letter-spacing:.02em}
+.cr{color:var(--accent)}.cy{color:var(--yellow)}.cg{color:var(--green)}.cb{color:var(--blue)}
+.cat-list{display:flex;flex-direction:column;gap:1px}
+.cat-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:7px 10px;border-radius:var(--radius-sm);cursor:pointer;
+  border:1px solid transparent;transition:all .18s;
+}
+.cat-row:hover{background:var(--surface2);border-color:var(--border)}
+.cat-row.on{background:var(--surface2);border-color:rgba(255,59,59,.25);box-shadow:inset 3px 0 0 var(--accent)}
+.cat-l{display:flex;align-items:center;gap:9px}
+.cat-ico{width:27px;height:27px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px}
+.cat-nm{font-size:.77rem;font-weight:500;letter-spacing:-.005em}
+.cat-cn{
+  font-size:.66rem;background:var(--surface3);
+  padding:2px 8px;border-radius:20px;color:var(--text2);font-weight:600;
+  min-width:24px;text-align:center;
+}
+.rep-scroll{flex:1;overflow-y:auto;padding:8px}
+.rep-card{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:12px;margin-bottom:6px;
+  cursor:pointer;transition:all .2s;animation:su .25s ease;
+  position:relative;overflow:hidden;
+}
+.rep-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:0;transition:opacity .2s;border-radius:3px 0 0 3px}
+@keyframes su{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.rep-card:hover{border-color:var(--border2);transform:translateX(2px)}
+.rep-card:hover::before{opacity:.7}
+.rep-card.sel{border-color:rgba(255,59,59,.3);background:rgba(255,59,59,.04)}
+.rep-card.sel::before{opacity:1}
+.rc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+.rc-tipo{font-size:.77rem;font-weight:600;display:flex;align-items:center;gap:6px;letter-spacing:-.01em}
+.sev{font-size:.57rem;font-weight:700;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.6px}
+.sev-Alto{background:rgba(255,59,59,.12);color:var(--accent);border:1px solid rgba(255,59,59,.2)}
+.sev-Medio{background:rgba(240,180,41,.1);color:var(--yellow);border:1px solid rgba(240,180,41,.2)}
+.sev-Bajo{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.rc-desc{font-size:.73rem;color:var(--text2);margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+.rc-meta{font-size:.65rem;color:var(--text3);display:flex;gap:10px;align-items:center}
+.new-chip{
+  display:inline-flex;align-items:center;
+  background:rgba(255,59,59,.12);color:var(--accent2);
+  font-size:.57rem;font-weight:700;padding:1px 6px;border-radius:4px;
+  border:1px solid rgba(255,59,59,.25);margin-left:4px;letter-spacing:.4px;
+  animation:chipPop .3s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes chipPop{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+
+/* MAP */
+#map-wrap{position:relative;overflow:hidden}
+#map{width:100%;height:100%;z-index:1}
+.leaflet-tile-pane{filter:none}
+.leaflet-container{background:#e8e0d8}
+.leaflet-control-zoom{border-radius:var(--radius-sm)!important;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.35)!important;border:1px solid var(--border2)!important}
+.leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border-color:var(--border)!important;font-size:16px!important;width:30px!important;height:30px!important;line-height:30px!important}
+.leaflet-control-zoom a:hover{background:var(--surface2)!important;color:var(--accent)!important}
+.leaflet-control-attribution{background:rgba(4,6,13,.88)!important;color:var(--text3)!important;font-size:.58rem!important;border-radius:6px 0 0 0!important;padding:3px 8px!important}
+.leaflet-popup-content-wrapper{
+  background:var(--surface)!important;color:var(--text)!important;
+  border:1px solid var(--border2)!important;border-radius:var(--radius)!important;
+  box-shadow:0 16px 48px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.04)!important;
+}
+.leaflet-popup-tip{background:var(--surface)!important}
+.leaflet-popup-content{margin:13px 15px!important;font-family:'DM Sans',sans-serif!important}
+.map-bottom{
+  position:absolute;bottom:0;left:0;right:0;z-index:400;
+  background:linear-gradient(to top,rgba(4,6,13,.95) 0%,rgba(4,6,13,.4) 60%,transparent 100%);
+  padding:24px 16px 12px;display:flex;align-items:center;justify-content:space-between;pointer-events:none;
+}
+.map-bottom>*{pointer-events:all}
+.map-info{font-size:.71rem;color:var(--text2)}
+.map-info strong{color:var(--text);font-weight:600}
+.loc-btn{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(10,14,26,.9);border:1px solid var(--border2);
+  border-radius:var(--radius-sm);padding:8px 15px;color:var(--text);
+  font-size:.76rem;font-weight:500;transition:all .2s;
+  backdrop-filter:blur(12px);
+  box-shadow:0 4px 16px rgba(0,0,0,.3);
+}
+.loc-btn:hover{border-color:rgba(34,197,94,.4);color:var(--green);background:rgba(34,197,94,.06)}
+.loc-ind{width:7px;height:7px;border-radius:50%;background:var(--text3);transition:background .3s}
+.loc-ind.on{background:var(--green);animation:pulse 1.5s infinite}
+
+/* PANEL */
+#panel{
+  background:var(--surface);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:inset 1px 0 0 rgba(255,255,255,.03);
+}
+.panel-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 6px;gap:2px}
+.ptab{
+  flex:1;padding:14px 6px;font-size:.73rem;font-weight:600;
+  color:var(--text3);background:transparent;border:none;
+  border-bottom:2px solid transparent;cursor:pointer;transition:all .2s;
+  letter-spacing:.01em;
+}
+.ptab:hover{color:var(--text2)}
+.ptab.on{color:var(--text);border-bottom-color:var(--accent)}
+.panel-body{flex:1;overflow-y:auto;padding:14px}
+.act-item{
+  display:flex;gap:11px;padding:10px 0;
+  border-bottom:1px solid var(--border);animation:su .25s ease;
+}
+.act-item:last-child{border-bottom:none}
+.act-ico{
+  width:32px;height:32px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;
+  border:1px solid rgba(255,255,255,.06);
+}
+.act-body{flex:1;min-width:0}
+.act-t{font-size:.76rem;font-weight:600;margin-bottom:2px;letter-spacing:-.01em}
+.act-s{font-size:.69rem;color:var(--text2);line-height:1.45}
+.act-time{font-size:.63rem;color:var(--text3);margin-top:3px}
+.det-card{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:15px;margin-bottom:10px;
+  box-shadow:0 2px 12px rgba(0,0,0,.2);
+}
+.det-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:11px}
+.det-tipo{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:8px;letter-spacing:-.02em}
+.det-desc{font-size:.78rem;color:var(--text2);line-height:1.65;margin-bottom:11px}
+.det-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:11px}
+.det-row{background:var(--surface3);border-radius:var(--radius-sm);padding:9px 11px}
+.det-row .dl{font-size:.59rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;font-weight:600}
+.det-row .dv{font-size:.76rem;font-weight:600}
+.det-coords{
+  font-family:monospace;font-size:.68rem;color:var(--blue);
+  margin-top:10px;background:rgba(59,130,246,.07);
+  border:1px solid rgba(59,130,246,.15);border-radius:6px;
+  padding:7px 10px;
+}
+.det-actions{display:flex;gap:8px;margin-top:12px}
+.det-btn{
+  flex:1;padding:9px;border-radius:var(--radius-sm);
+  font-size:.74rem;font-weight:600;transition:all .2s;
+  letter-spacing:.01em;
+}
+.det-confirm{background:rgba(34,197,94,.08);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.det-confirm:hover{background:rgba(34,197,94,.15);transform:translateY(-1px)}
+.det-share{background:var(--surface3);color:var(--text2);border:1px solid var(--border)}
+.det-share:hover{border-color:var(--border3);color:var(--text);transform:translateY(-1px)}
+.det-empty{text-align:center;padding:44px 0;color:var(--text3)}
+.heat-legend{
+  display:flex;align-items:center;gap:8px;padding:9px 12px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);margin-bottom:13px;font-size:.68rem;
+}
+.hleg{display:flex;align-items:center;gap:4px;color:var(--text2)}
+.hd{width:7px;height:7px;border-radius:50%}
+.hbr{margin-bottom:13px}
+.hbr-top{display:flex;justify-content:space-between;margin-bottom:5px;font-size:.76rem;font-weight:500}
+.hbr-pct{font-size:.68rem;color:var(--text2)}
+.hbr-track{height:4px;background:var(--surface3);border-radius:3px;overflow:hidden}
+.hbr-fill{height:100%;border-radius:3px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(4,6,13,.85);backdrop-filter:blur(14px);z-index:1000;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:var(--radius-lg);width:92%;max-width:490px;max-height:92vh;overflow-y:auto;
+  animation:popIn .3s cubic-bezier(.34,1.56,.64,1);
+  box-shadow:0 40px 100px rgba(0,0,0,.7),0 0 60px var(--glow2),inset 0 1px 0 rgba(255,255,255,.07);
+}
+@keyframes popIn{from{opacity:0;transform:scale(.9) translateY(20px)}to{opacity:1;transform:none}}
+.modal-head{padding:22px 22px 0;display:flex;justify-content:space-between;align-items:flex-start}
+.modal-title{font-family:'Syne',sans-serif;font-size:1.45rem;font-weight:800;letter-spacing:-.03em}
+.modal-title b{color:var(--accent)}
+.modal-x{
+  width:30px;height:30px;border-radius:var(--radius-sm);
+  background:var(--surface2);border:1px solid var(--border);
+  color:var(--text2);font-size:18px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;
+}
+.modal-x:hover{color:var(--text);border-color:var(--border2);background:var(--surface3)}
+.modal-body{padding:18px 22px 22px}
+.steps{display:flex;gap:4px;margin-bottom:20px}
+.sd{flex:1;height:3px;border-radius:2px;background:var(--surface3);transition:all .35s}
+.sd.done{background:var(--accent)}
+.sd.cur{background:var(--accent);opacity:.45}
+.form-step{display:none}
+.form-step.show{display:block;animation:fi .22s ease}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.fl{display:block;font-size:.67rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1.1px;margin-bottom:7px;margin-top:15px}
+.fc{
+  width:100%;background:var(--surface2);border:1px solid var(--border2);
+  border-radius:var(--radius-sm);color:var(--text);padding:10px 14px;font-size:.83rem;
+  transition:border-color .2s,box-shadow .2s;
+}
+.fc:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,59,59,.1)}
+textarea.fc{resize:vertical;min-height:82px;line-height:1.5}
+select.fc{cursor:pointer}
+select.fc option{background:var(--surface)}
+.tipo-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.tc{
+  background:var(--surface2);border:1.5px solid var(--border);
+  border-radius:var(--radius-sm);padding:12px 6px;text-align:center;
+  cursor:pointer;transition:all .2s;
+}
+.tc:hover{border-color:var(--border2);background:var(--surface3);transform:translateY(-1px)}
+.tc.sel{border-color:var(--accent);background:rgba(255,59,59,.06);box-shadow:0 0 0 3px rgba(255,59,59,.08),0 4px 12px rgba(255,59,59,.1)}
+.tc .ti{font-size:22px;display:block;margin-bottom:5px}
+.tc .tn{font-size:.62rem;font-weight:600;color:var(--text2);letter-spacing:.01em}
+.tc.sel .tn{color:var(--accent)}
+.sev-row{display:flex;gap:7px}
+.so{
+  flex:1;padding:10px;border-radius:var(--radius-sm);
+  background:var(--surface2);border:1.5px solid var(--border);
+  text-align:center;cursor:pointer;transition:all .2s;font-size:.74rem;font-weight:600;
+}
+.so.s-Bajo:hover,.so.s-Bajo.sel{border-color:var(--green);color:var(--green);background:rgba(34,197,94,.07)}
+.so.s-Medio:hover,.so.s-Medio.sel{border-color:var(--yellow);color:var(--yellow);background:rgba(240,180,41,.07)}
+.so.s-Alto:hover,.so.s-Alto.sel{border-color:var(--accent);color:var(--accent);background:rgba(255,59,59,.07)}
+.loc-preview{
+  background:var(--surface2);border:1px solid var(--border2);
+  border-radius:var(--radius-sm);padding:12px 14px;display:flex;align-items:center;gap:12px;
+}
+.lp-dot{width:11px;height:11px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .3s}
+.lp-dot.on{background:var(--green);animation:pulse 1.5s infinite}
+.lp-text{font-size:.78rem;color:var(--text2);font-weight:500}
+.lp-coords{font-family:monospace;font-size:.69rem;color:var(--blue);margin-top:3px}
+.modal-foot{display:flex;gap:9px;margin-top:20px}
+.btn-back{
+  padding:10px 18px;background:transparent;border:1px solid var(--border2);
+  border-radius:var(--radius-sm);color:var(--text2);font-size:.8rem;font-weight:500;transition:all .2s;
+}
+.btn-back:hover{color:var(--text);background:var(--surface2);border-color:var(--border3)}
+.btn-next{
+  flex:1;padding:11px;
+  background:linear-gradient(135deg,var(--accent),#cc1e1e);
+  border:none;border-radius:var(--radius-sm);color:#fff;
+  font-size:.83rem;font-weight:600;transition:all .22s;
+  box-shadow:0 4px 16px var(--glow);letter-spacing:.01em;
+  position:relative;overflow:hidden;
+}
+.btn-next::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.1),transparent);pointer-events:none}
+.btn-next:hover{transform:translateY(-1px);box-shadow:0 6px 22px var(--glow)}
+.btn-next:active{transform:translateY(0)}
+.btn-next:disabled{opacity:.3;transform:none;cursor:not-allowed;box-shadow:none}
+.success{text-align:center;padding:16px 0}
+.success-ring{
+  width:66px;height:66px;border-radius:50%;
+  background:rgba(34,197,94,.08);border:2px solid var(--green);
+  display:flex;align-items:center;justify-content:center;font-size:28px;
+  margin:0 auto 16px;animation:popIn .45s cubic-bezier(.34,1.56,.64,1);
+  box-shadow:0 0 30px rgba(34,197,94,.2);
+}
+.success h3{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--green);margin-bottom:7px;letter-spacing:-.03em}
+.success p{font-size:.8rem;color:var(--text2);line-height:1.65}
+.rep-id{
+  display:inline-block;font-family:monospace;
+  background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);
+  padding:6px 14px;border-radius:6px;color:var(--blue);font-size:.77rem;margin-top:12px;
+}
+
+/* TOAST */
+#toasts{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.toast{
+  background:var(--surface2);
+  border:1px solid var(--border2);
+  border-radius:var(--radius);padding:11px 17px;font-size:.78rem;
+  display:flex;align-items:center;gap:10px;
+  box-shadow:0 12px 36px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06);
+  animation:ti .3s cubic-bezier(.34,1.56,.64,1);max-width:280px;
+  backdrop-filter:blur(16px);
+}
+@keyframes ti{from{opacity:0;transform:translateX(24px) scale(.95)}to{opacity:1;transform:none}}
+.toast-ico{font-size:16px;flex-shrink:0}
+.toast-t{font-weight:600;margin-bottom:1px;letter-spacing:-.01em}
+.toast-s{color:var(--text2);font-size:.7rem}
+
+@media(max-width:860px){#app{grid-template-columns:0 1fr 0}#sidebar,#panel{display:none}}
+
+/* ── AUTH SCREEN ─────────────────────────────────────── */
+#auth-screen{
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:var(--bg);
+  align-items:center;justify-content:center;
+  flex-direction:column;overflow-y:auto;
+}
+#auth-screen.show{display:flex}
+.auth-bg{
+  position:fixed;inset:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 100% 50% at 50% -10%, rgba(255,59,59,.18) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 40% at 90% 90%, rgba(59,130,246,.08) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 30% at 10% 70%, rgba(168,85,247,.06) 0%, transparent 50%);
+}
+/* Líneas decorativas de fondo */
+.auth-bg::after{
+  content:'';position:absolute;inset:0;
+  background-image:repeating-linear-gradient(0deg,transparent,transparent 60px,rgba(255,255,255,.015) 60px,rgba(255,255,255,.015) 61px),
+                   repeating-linear-gradient(90deg,transparent,transparent 60px,rgba(255,255,255,.015) 60px,rgba(255,255,255,.015) 61px);
+}
+.auth-box{
+  position:relative;width:94%;max-width:420px;
+  background:linear-gradient(180deg,var(--surface) 0%,rgba(10,14,26,.98) 100%);
+  border:1px solid var(--border2);
+  border-radius:24px;padding:40px 36px 36px;
+  box-shadow:0 50px 120px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.05),inset 0 1px 0 rgba(255,255,255,.08);
+  animation:popIn .35s cubic-bezier(.34,1.56,.64,1);
+  margin:20px 0;
+}
+/* Badge superior */
+.auth-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(255,59,59,.08);border:1px solid rgba(255,59,59,.2);
+  border-radius:20px;padding:5px 14px;font-size:.7rem;font-weight:600;
+  color:var(--accent2);margin:0 auto 24px;letter-spacing:.03em;
+  text-transform:uppercase;
+}
+.auth-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+.auth-logo{display:flex;align-items:center;gap:13px;justify-content:center;margin-bottom:8px}
+.auth-logo-mark{
+  width:48px;height:48px;
+  background:linear-gradient(135deg,var(--accent) 0%,#a00 100%);
+  border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;
+  box-shadow:0 0 32px rgba(255,59,59,.4),0 8px 20px rgba(255,59,59,.25);
+  position:relative;
+}
+.auth-logo-mark::after{content:'';position:absolute;inset:0;border-radius:14px;border:1px solid rgba(255,255,255,.2)}
+.auth-logo-name{font-family:'Syne',sans-serif;font-size:1.75rem;font-weight:800;letter-spacing:-.04em}
+.auth-logo-name span{color:var(--accent)}
+.auth-subtitle{text-align:center;font-size:.78rem;color:var(--text3);margin-bottom:28px;line-height:1.5}
+.auth-divider{display:flex;align-items:center;gap:10px;margin:20px 0;color:var(--text3);font-size:.7rem}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.auth-tabs{
+  display:flex;background:var(--surface2);border-radius:12px;padding:4px;
+  margin-bottom:28px;border:1px solid var(--border);gap:4px;
+}
+.auth-tab{
+  flex:1;padding:10px;border-radius:9px;font-size:.84rem;font-weight:600;
+  color:var(--text3);background:transparent;border:none;cursor:pointer;
+  transition:all .22s;letter-spacing:.005em;
+}
+.auth-tab:hover{color:var(--text2)}
+.auth-tab.on{
+  background:linear-gradient(135deg,var(--accent),#cc1e1e);
+  color:#fff;box-shadow:0 4px 14px rgba(255,59,59,.35);
+}
+.auth-form{display:none}
+.auth-form.show{display:block;animation:fi .22s ease}
+.auth-label{
+  display:flex;align-items:center;gap:6px;
+  font-size:.67rem;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:1.2px;margin-bottom:7px;margin-top:18px;
+}
+.auth-input{
+  width:100%;
+  background:var(--surface2);
+  border:1.5px solid var(--border2);
+  border-radius:10px;color:var(--text);
+  padding:13px 15px;font-size:.92rem;
+  transition:all .2s;
+}
+.auth-input:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(255,59,59,.1);
+  background:var(--surface3);
+}
+.auth-input::placeholder{color:var(--text3)}
+.auth-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.auth-btn{
+  width:100%;margin-top:24px;padding:15px;
+  background:linear-gradient(135deg,var(--accent) 0%,#cc1e1e 100%);
+  border:none;border-radius:11px;color:#fff;
+  font-size:.95rem;font-weight:700;cursor:pointer;transition:all .22s;
+  box-shadow:0 6px 22px rgba(255,59,59,.4);letter-spacing:.02em;
+  position:relative;overflow:hidden;
+}
+.auth-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.15) 0%,transparent 100%);pointer-events:none}
+.auth-btn:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(255,59,59,.5)}
+.auth-btn:active{transform:translateY(0);box-shadow:0 4px 14px rgba(255,59,59,.3)}
+.auth-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+.auth-err{
+  margin-top:14px;padding:11px 15px;
+  background:rgba(255,59,59,.07);border:1px solid rgba(255,59,59,.2);
+  border-radius:9px;font-size:.79rem;color:var(--accent);display:none;
+  display:flex;align-items:center;gap:8px;
+}
+.auth-err.show{display:flex}
+.auth-footer{text-align:center;margin-top:20px;font-size:.76rem;color:var(--text3);line-height:1.6}
+/* topbar user info */
+#user-info{display:flex;align-items:center;gap:8px}
+#user-name{font-size:.75rem;font-weight:600;color:var(--text2);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn-logout{
+  padding:5px 11px;background:transparent;border:1px solid var(--border2);
+  border-radius:6px;color:var(--text3);font-size:.7rem;font-weight:600;
+  transition:all .2s;cursor:pointer;
+}
+.btn-logout:hover{border-color:var(--accent);color:var(--accent)}
+/* ── DASHBOARD VIEW ──────────────────────────────────── */
+#view-dashboard,#view-zona{
+  display:none;position:fixed;top:58px;left:0;right:0;bottom:0;
+  z-index:850;background:var(--bg);overflow-y:auto;padding:24px;
+  animation:fi .2s ease;
+}
+.dash-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:900px;margin:0 auto 24px}
+.dash-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:20px;text-align:center}
+.dash-card .big{font-family:'Syne',sans-serif;font-size:2.5rem;font-weight:800;line-height:1}
+.dash-card .lbl{font-size:.72rem;color:var(--text3);margin-top:6px;text-transform:uppercase;letter-spacing:1px}
+.dash-title{font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;margin-bottom:20px;text-align:center;letter-spacing:-.02em}
+.zona-info{max-width:500px;margin:0 auto;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:24px}
+.zona-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.zona-row:last-child{border-bottom:none}
+.zona-lbl{font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.8px}
+.zona-val{font-size:.85rem;font-weight:600;color:var(--text)}
+
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="logo">
+      <div class="logo-mark">📍</div>
+      <div class="logo-name">Ciudad<span>Alerta</span></div>
+      <div class="divider"></div>
+      <div class="live-pill"><div class="live-dot"></div>En vivo</div>
+    </div>
+    <nav class="topbar-nav">
+      <button class="nav-btn on" id="nav-mapa" onclick="showView('mapa',this)">🗺 Mapa</button>
+      <button class="nav-btn" id="nav-dash" onclick="showView('dashboard',this)">📊 Dashboard</button>
+      <button class="nav-btn" id="nav-zona" onclick="showView('zona',this)">📍 Mi Zona</button>
+    </nav>
+    <div class="topbar-right">
+      <div id="gps-pill" style="display:flex;align-items:center;gap:7px;background:rgba(255,59,59,.06);border:1px solid rgba(255,59,59,.18);border-radius:8px;padding:6px 12px;font-size:.69rem;font-weight:500;color:var(--text2);transition:all .4s;letter-spacing:.01em">
+        <div id="gps-pill-dot" style="width:7px;height:7px;border-radius:50%;background:#3d4a5c;flex-shrink:0;transition:all .3s"></div>
+        <span id="gps-pill-txt">Sin GPS</span>
+      </div>
+      <button class="btn-report" onclick="openModal()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Nuevo Reporte
+      </button>
+      <div id="user-info">
+        <span id="user-name"></span>
+        <div class="avatar" id="user-avatar">CA</div>
+        <button class="btn-logout" onclick="doLogout()">Salir</button>
+      </div>
+    </div>
+  </header>
+
+  <aside id="sidebar">
+    <div class="sb-sec">
+      <div class="sb-ttl">Resumen del día</div>
+      <div class="sg">
+        <div class="sc cr" style="color:var(--accent)"><div style="font-size:.68rem;margin-bottom:5px;opacity:.6">📋</div><div class="sn cr" id="sn-t">0</div><div class="sl">Total reportes</div></div>
+        <div class="sc cy" style="color:var(--yellow)"><div style="font-size:.68rem;margin-bottom:5px;opacity:.6">⏳</div><div class="sn cy" id="sn-p">0</div><div class="sl">Pendientes</div></div>
+        <div class="sc cg" style="color:var(--green)"><div style="font-size:.68rem;margin-bottom:5px;opacity:.6">✅</div><div class="sn cg" id="sn-r">0</div><div class="sl">Resueltos</div></div>
+        <div class="sc cb" style="color:var(--blue)"><div style="font-size:.68rem;margin-bottom:5px;opacity:.6">🔴</div><div class="sn cb" id="sn-c">0</div><div class="sl">Críticos</div></div>
+      </div>
+    </div>
+    <div class="sb-sec">
+      <div class="sb-ttl">Categorías</div>
+      <div class="cat-list" id="cat-list"></div>
+    </div>
+    <div class="rep-scroll" id="rep-list"></div>
+  </aside>
+
+  <div id="map-wrap">
+    <div id="map"></div>
+    <div class="map-bottom">
+      <div class="map-info">Mostrando <strong id="vis-cnt">0</strong> reportes · <span id="area-lbl">Cargando…</span></div>
+      <button class="loc-btn" onclick="goToUser()">
+        <div class="loc-ind" id="loc-ind"></div>
+        Mi ubicación
+      </button>
+    </div>
+  </div>
+
+  <aside id="panel">
+    <div class="panel-tabs">
+      <button class="ptab on" onclick="setTab(this,'act')">Actividad</button>
+      <button class="ptab" onclick="setTab(this,'det')">Detalle</button>
+      <button class="ptab" onclick="setTab(this,'heat')">Mapa Calor</button>
+    </div>
+    <div class="panel-body">
+      <div id="tab-act"><div id="act-feed"></div></div>
+      <div id="tab-det" style="display:none">
+        <div id="det-content"><div class="det-empty"><div style="width:52px;height:52px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 14px">🗺️</div><p style="font-size:.77rem;line-height:1.6;color:var(--text2)">Selecciona un reporte<br/>para ver sus detalles.</p></div></div>
+      </div>
+      <div id="tab-heat" style="display:none">
+        <div class="heat-legend">
+          <span style="color:var(--text3);margin-right:4px">Severidad:</span>
+          <div class="hleg"><div class="hd" style="background:var(--green)"></div>Bajo</div>
+          <div class="hleg"><div class="hd" style="background:var(--yellow)"></div>Medio</div>
+          <div class="hleg"><div class="hd" style="background:var(--accent)"></div>Alto</div>
+        </div>
+        <div id="heat-list"></div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Nuevo <b>Reporte</b></div>
+      <button class="modal-x" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="steps" id="steps-bar"></div>
+      <div class="form-step show" id="fs1">
+        <label class="fl">¿Qué tipo de daño encontraste?</label>
+        <div class="tipo-grid" id="tipo-grid"></div>
+        <div class="modal-foot">
+          <button class="btn-next" id="btn-s1" onclick="goStep(2)" disabled>Continuar →</button>
+        </div>
+      </div>
+      <div class="form-step" id="fs2">
+        <label class="fl">Descripción</label>
+        <textarea class="fc" id="f-desc" placeholder="Describe brevemente lo que viste…" rows="3"></textarea>
+        <label class="fl">Severidad</label>
+        <div class="sev-row">
+          <div class="so s-Bajo" onclick="selSev(this,'Bajo')">🟢 Bajo</div>
+          <div class="so s-Medio sel" onclick="selSev(this,'Medio')">🟡 Medio</div>
+          <div class="so s-Alto" onclick="selSev(this,'Alto')">🔴 Alto</div>
+        </div>
+        <label class="fl">Foto (opcional)</label>
+        <input type="file" accept="image/*" capture="environment" class="fc" id="f-foto" style="padding:7px 11px;color:var(--text2)" onchange="loadFoto(this)"/>
+        <div id="foto-preview" style="display:none;margin-top:8px;border-radius:10px;overflow:hidden;border:1px solid var(--b2)">
+          <img id="foto-img" style="width:100%;max-height:180px;object-fit:cover;display:block"/>
+        </div>
+        <div class="modal-foot">
+          <button class="btn-back" onclick="goStep(1)">← Atrás</button>
+          <button class="btn-next" onclick="goStep(3)">Continuar →</button>
+        </div>
+      </div>
+      <div class="form-step" id="fs3">
+        <label class="fl">Tu ubicación GPS en tiempo real</label>
+        <div class="loc-preview">
+          <div class="lp-dot" id="lp-dot"></div>
+          <div>
+            <div class="lp-text" id="lp-txt">Obteniendo señal GPS…</div>
+            <div class="lp-coords" id="lp-coords"></div>
+          </div>
+        </div>
+        <label class="fl">Dirección aproximada (opcional)</label>
+        <input type="text" class="fc" id="f-dir" placeholder="Ej: Cra 7 con Calle 32, Bogotá"/>
+        <div class="modal-foot">
+          <button class="btn-back" onclick="goStep(2)">← Atrás</button>
+          <button class="btn-next" onclick="submitReport()">✓ Enviar Reporte</button>
+        </div>
+      </div>
+      <div class="form-step" id="fs4">
+        <div class="success">
+          <div class="success-ring">✓</div>
+          <h3>¡Reporte Enviado!</h3>
+          <p>Tu reporte fue registrado y enviado a la empresa responsable. Te avisaremos del estado.</p>
+          <div class="rep-id" id="rep-id-val"></div>
+          <div id="emp-badge"></div>
+          <div class="modal-foot" style="justify-content:center;margin-top:18px">
+            <button class="btn-next" style="max-width:180px" onclick="closeModal()">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const TIPOS=[
+  {id:'bache',ico:'🕳️',name:'Bache',color:'#ff4444',bg:'rgba(255,68,68,.12)'},
+  {id:'alumbrado',ico:'💡',name:'Alumbrado',color:'#eab308',bg:'rgba(234,179,8,.12)'},
+  {id:'derrumbe',ico:'⛰️',name:'Derrumbe',color:'#f97316',bg:'rgba(249,115,22,.12)'},
+  {id:'inundacion',ico:'🌊',name:'Inundación',color:'#3b82f6',bg:'rgba(59,130,246,.12)'},
+  {id:'arbol',ico:'🌲',name:'Árbol caído',color:'#22c55e',bg:'rgba(34,197,94,.12)'},
+  {id:'semaforo',ico:'🚦',name:'Semáforo',color:'#a855f7',bg:'rgba(168,85,247,.12)'},
+  {id:'basura',ico:'🗑️',name:'Basura',color:'#6b7280',bg:'rgba(107,114,128,.12)'},
+  {id:'otro',ico:'⚠️',name:'Otro',color:'#e8eaf0',bg:'rgba(232,234,240,.05)'},
+];
+// Empresas por ciudad colombiana
+const EMPRESAS_CIUDAD={
+  bogota:{
+    bache:     {nombre:'IDU — Instituto de Desarrollo Urbano',     ico:'🏗️', color:'#f97316'},
+    alumbrado: {nombre:'ENEL Codensa — Alumbrado Público',         ico:'💡', color:'#eab308'},
+    derrumbe:  {nombre:'IDIGER — Gestión del Riesgo Bogotá',       ico:'⛰️', color:'#ef4444'},
+    inundacion:{nombre:'EAAB — Empresa Acueducto Bogotá',          ico:'🌊', color:'#3b82f6'},
+    arbol:     {nombre:'Jardín Botánico de Bogotá',                ico:'🌲', color:'#22c55e'},
+    semaforo:  {nombre:'SDM — Secretaría Distrital de Movilidad',  ico:'🚦', color:'#a855f7'},
+    basura:    {nombre:'UAESP — Unidad de Servicios Públicos',     ico:'🗑️', color:'#6b7280'},
+    otro:      {nombre:'Alcaldía Mayor de Bogotá',                 ico:'🏛️', color:'#8892a4'},
+  },
+  medellin:{
+    bache:     {nombre:'ISVIMED — Infraestructura Vial Medellín',  ico:'🏗️', color:'#f97316'},
+    alumbrado: {nombre:'EPM — Empresas Públicas de Medellín',      ico:'💡', color:'#eab308'},
+    derrumbe:  {nombre:'DAGRD — Gestión del Riesgo Medellín',      ico:'⛰️', color:'#ef4444'},
+    inundacion:{nombre:'EPM Aguas — Acueducto Medellín',           ico:'🌊', color:'#3b82f6'},
+    arbol:     {nombre:'Secretaría de Medio Ambiente Medellín',    ico:'🌲', color:'#22c55e'},
+    semaforo:  {nombre:'Movilidad Medellín — Secretaría',          ico:'🚦', color:'#a855f7'},
+    basura:    {nombre:'EMVARIAS — Empresas Varias Medellín',      ico:'🗑️', color:'#6b7280'},
+    otro:      {nombre:'Alcaldía de Medellín',                     ico:'🏛️', color:'#8892a4'},
+  },
+  cali:{
+    bache:     {nombre:'DAGMA / Obras Públicas Cali',              ico:'🏗️', color:'#f97316'},
+    alumbrado: {nombre:'EMCALI — Alumbrado Público Cali',          ico:'💡', color:'#eab308'},
+    derrumbe:  {nombre:'DAGMA — Gestión Ambiental Cali',           ico:'⛰️', color:'#ef4444'},
+    inundacion:{nombre:'EMCALI Aguas — Acueducto Cali',            ico:'🌊', color:'#3b82f6'},
+    arbol:     {nombre:'DAGMA — Medio Ambiente Cali',              ico:'🌲', color:'#22c55e'},
+    semaforo:  {nombre:'Movilidad Cali — Secretaría',              ico:'🚦', color:'#a855f7'},
+    basura:    {nombre:'Ciudad Limpia / EMCALI Aseo',              ico:'🗑️', color:'#6b7280'},
+    otro:      {nombre:'Alcaldía de Santiago de Cali',             ico:'🏛️', color:'#8892a4'},
+  },
+  barranquilla:{
+    bache:     {nombre:'Secretaría de Obras Públicas Barranquilla',ico:'🏗️', color:'#f97316'},
+    alumbrado: {nombre:'Electricaribe / Air-e Barranquilla',       ico:'💡', color:'#eab308'},
+    derrumbe:  {nombre:'DADMA — Gestión del Riesgo Barranquilla',  ico:'⛰️', color:'#ef4444'},
+    inundacion:{nombre:'Triple A — Acueducto Barranquilla',        ico:'🌊', color:'#3b82f6'},
+    arbol:     {nombre:'DADMA — Medio Ambiente Barranquilla',      ico:'🌲', color:'#22c55e'},
+    semaforo:  {nombre:'Secretaría de Movilidad Barranquilla',     ico:'🚦', color:'#a855f7'},
+    basura:    {nombre:'Triple A Aseo — Barranquilla',             ico:'🗑️', color:'#6b7280'},
+    otro:      {nombre:'Alcaldía de Barranquilla',                 ico:'🏛️', color:'#8892a4'},
+  },
+  bucaramanga:{
+    bache:     {nombre:'IDUBU — Infraestructura Urbana Bucaramanga',ico:'🏗️', color:'#f97316'},
+    alumbrado: {nombre:'CENS — Alumbrado Bucaramanga',             ico:'💡', color:'#eab308'},
+    derrumbe:  {nombre:'CREPAD — Gestión del Riesgo Santander',    ico:'⛰️', color:'#ef4444'},
+    inundacion:{nombre:'ACUEDUCTO Metropolitano de Bucaramanga',   ico:'🌊', color:'#3b82f6'},
+    arbol:     {nombre:'Secretaría de Medio Ambiente Bucaramanga', ico:'🌲', color:'#22c55e'},
+    semaforo:  {nombre:'Secretaría de Tránsito Bucaramanga',       ico:'🚦', color:'#a855f7'},
+    basura:    {nombre:'EMAB — Aseo Bucaramanga',                  ico:'🗑️', color:'#6b7280'},
+    otro:      {nombre:'Alcaldía de Bucaramanga',                  ico:'🏛️', color:'#8892a4'},
+  },
+  cartagena:{
+    bache:     {nombre:'IDU Cartagena — Infraestructura Vial',     ico:'🏗️', color:'#f97316'},
+    alumbrado: {nombre:'Afinia — Alumbrado Público Cartagena',     ico:'💡', color:'#eab308'},
+    derrumbe:  {nombre:'DPAD — Gestión del Riesgo Cartagena',      ico:'⛰️', color:'#ef4444'},
+    inundacion:{nombre:'Aguas de Cartagena — ACUACAR',             ico:'🌊', color:'#3b82f6'},
+    arbol:     {nombre:'DADIS — Medio Ambiente Cartagena',         ico:'🌲', color:'#22c55e'},
+    semaforo:  {nombre:'Secretaría de Movilidad Cartagena',        ico:'🚦', color:'#a855f7'},
+    basura:    {nombre:'ESSA Aseo / Lime Cartagena',               ico:'🗑️', color:'#6b7280'},
+    otro:      {nombre:'Alcaldía Mayor de Cartagena',              ico:'🏛️', color:'#8892a4'},
+  },
+  default:{
+    bache:     {nombre:'Secretaría de Obras Públicas',             ico:'🏗️', color:'#f97316'},
+    alumbrado: {nombre:'Empresa de Energía Local',                 ico:'💡', color:'#eab308'},
+    derrumbe:  {nombre:'Gestión del Riesgo Municipal',             ico:'⛰️', color:'#ef4444'},
+    inundacion:{nombre:'Empresa de Acueducto Local',               ico:'🌊', color:'#3b82f6'},
+    arbol:     {nombre:'Secretaría de Medio Ambiente',             ico:'🌲', color:'#22c55e'},
+    semaforo:  {nombre:'Secretaría de Tránsito y Movilidad',       ico:'🚦', color:'#a855f7'},
+    basura:    {nombre:'Empresa de Aseo Municipal',                ico:'🗑️', color:'#6b7280'},
+    otro:      {nombre:'Alcaldía Municipal',                       ico:'🏛️', color:'#8892a4'},
+  },
+};
+
+// Detectar ciudad por coordenadas GPS
+function getCiudad(lat,lng){
+  const ciudades=[
+    {key:'bogota',     lat:4.7110,  lng:-74.0721, r:0.35},
+    {key:'medellin',   lat:6.2442,  lng:-75.5812, r:0.25},
+    {key:'cali',       lat:3.4516,  lng:-76.5320, r:0.25},
+    {key:'barranquilla',lat:10.9685,lng:-74.7813, r:0.20},
+    {key:'bucaramanga',lat:7.1193,  lng:-73.1227, r:0.20},
+    {key:'cartagena',  lat:10.3910, lng:-75.4794, r:0.20},
+  ];
+  for(const c of ciudades){
+    const d=Math.sqrt(Math.pow(lat-c.lat,2)+Math.pow(lng-c.lng,2));
+    if(d<=c.r)return c.key;
+  }
+  return'default';
+}
+
+function getEmpresa(tipo,lat,lng){
+  const ciudad=getCiudad(lat||BL,lng||BLN);
+  const mapa=EMPRESAS_CIUDAD[ciudad]||EMPRESAS_CIUDAD.default;
+  return mapa[tipo]||mapa.otro;
+}
+
+
+const SC={'Alto':'#ff4444','Medio':'#eab308','Bajo':'#22c55e'};
+const BL=4.7110,BLN=-74.0721;
+// Sin datos demo — empieza vacío, solo reportes reales
+
+let map,userMarker,repMarkers=[];
+let S={reportes:[],selId:null,filterCat:null,userLat:null,userLng:null,formTipo:null,formSev:'Medio'};
+let curStep=1;
+
+function makeIcon(tipo,sev){
+  const t=TIPOS.find(x=>x.id===tipo)||TIPOS[7];
+  const c=SC[sev]||'#fff';
+  return L.divIcon({
+    html:`<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
+      <defs><filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="${c}" flood-opacity=".45"/></filter></defs>
+      <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 26 18 26S36 31.5 36 18C36 8.06 27.94 0 18 0z" fill="${c}" filter="url(#sh)" opacity=".92"/>
+      <circle cx="18" cy="17" r="11" fill="rgba(0,0,0,.35)"/>
+      <text x="18" y="22" font-size="13" text-anchor="middle">${t.ico}</text>
+    </svg>`,
+    className:'',iconSize:[36,44],iconAnchor:[18,44],popupAnchor:[0,-46]
+  });
+}
+function makeUserIcon(){
+  return L.divIcon({
+    html:`<div style="
+      position:relative;width:22px;height:22px;
+      display:flex;align-items:center;justify-content:center;
+    ">
+      <!-- outer pulse ring -->
+      <div style="
+        position:absolute;width:44px;height:44px;border-radius:50%;
+        background:rgba(59,130,246,.18);
+        animation:userRing 2s ease-in-out infinite;
+        top:50%;left:50%;transform:translate(-50%,-50%);
+      "></div>
+      <!-- mid ring -->
+      <div style="
+        position:absolute;width:28px;height:28px;border-radius:50%;
+        background:rgba(59,130,246,.3);border:2px solid rgba(59,130,246,.5);
+        top:50%;left:50%;transform:translate(-50%,-50%);
+      "></div>
+      <!-- core dot -->
+      <div style="
+        position:relative;width:14px;height:14px;border-radius:50%;
+        background:#3b82f6;border:2.5px solid #fff;
+        box-shadow:0 0 12px rgba(59,130,246,.9),0 0 4px rgba(59,130,246,1);
+        z-index:2;
+      "></div>
+      <style>
+        @keyframes userRing{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.6}50%{transform:translate(-50%,-50%) scale(1.4);opacity:0}}
+      </style>
+    </div>`,
+    className:'',iconSize:[44,44],iconAnchor:[22,22]
+  });
+}
+
+function initMap(lat,lng){
+  map=L.map('map',{center:[lat,lng],zoom:14,zoomControl:true});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+    attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19
+  }).addTo(map);
+  plotMarkers();renderAll();
+  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+    .then(r=>r.json()).then(d=>{
+      const lbl=d.address?.suburb||d.address?.city||d.address?.town||'Tu zona';
+      document.getElementById('area-lbl').textContent=lbl;
+    }).catch(()=>{document.getElementById('area-lbl').textContent=`${lat.toFixed(4)}, ${lng.toFixed(4)}`;});
+}
+
+function plotMarkers(){
+  repMarkers.forEach(m=>map.removeLayer(m));repMarkers=[];
+  const list=S.filterCat?S.reportes.filter(r=>r.tipo===S.filterCat):S.reportes;
+  document.getElementById('vis-cnt').textContent=list.length;
+  list.forEach(r=>{
+    const t=TIPOS.find(x=>x.id===r.tipo)||TIPOS[7];
+    const m=L.marker([r.lat,r.lng],{icon:makeIcon(r.tipo,r.sev)}).addTo(map);
+    m.bindPopup(`<div style="min-width:155px;font-family:'Instrument Sans',sans-serif">
+      <div style="font-weight:700;font-size:.87rem;margin-bottom:4px">${t.ico} ${t.name}</div>
+      <div style="font-size:.74rem;color:#8892a4;margin-bottom:6px;line-height:1.4">${r.desc}</div>
+      <div style="display:flex;justify-content:space-between;font-size:.67rem">
+        <span style="color:${SC[r.sev]};font-weight:700">${r.sev}</span>
+        <span style="color:#4a5568">${r.hora}</span>
+      </div>
+      <button onclick="selectReport(${r.id})" style="margin-top:8px;width:100%;padding:5px;background:#ff4444;color:#fff;border:none;border-radius:6px;font-size:.71rem;font-weight:600;cursor:pointer;font-family:inherit">Ver detalles</button>
+    </div>`);
+    m.on('click',()=>selectReport(r.id));
+    repMarkers.push(m);
+  });
+}
+
+function updateGpsPill(lat,lng){
+  const pill=document.getElementById('gps-pill');
+  const dot=document.getElementById('gps-pill-dot');
+  const txt=document.getElementById('gps-pill-txt');
+  pill.style.background='rgba(34,197,94,.08)';
+  pill.style.borderColor='rgba(34,197,94,.35)';
+  pill.style.color='#22c55e';
+  dot.style.background='#22c55e';
+  dot.style.boxShadow='0 0 8px rgba(34,197,94,.9)';
+  dot.style.animation='gp 1.5s infinite';
+  txt.textContent=`${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+}
+
+function initGeo(){
+  if(!navigator.geolocation){fallback();return;}
+  navigator.geolocation.getCurrentPosition(pos=>{
+    S.userLat=pos.coords.latitude;S.userLng=pos.coords.longitude;
+    document.getElementById('loc-ind').classList.add('on');
+    updateGpsPill(S.userLat,S.userLng);
+    initMap(S.userLat,S.userLng);
+    placeUser(S.userLat,S.userLng);
+    showToast('📍','GPS activo',`${S.userLat.toFixed(5)}, ${S.userLng.toFixed(5)}`);
+    navigator.geolocation.watchPosition(p2=>{
+      S.userLat=p2.coords.latitude;S.userLng=p2.coords.longitude;
+      updateGpsPill(S.userLat,S.userLng);
+      placeUser(S.userLat,S.userLng);
+    },null,{enableHighAccuracy:true});
+  },()=>fallback(),{enableHighAccuracy:true,timeout:8000});
+}
+function fallback(){showToast('⚠️','Sin GPS','Usando Bogotá como referencia.');initMap(BL,BLN);}
+function placeUser(lat,lng){
+  if(userMarker)map.removeLayer(userMarker);
+  userMarker=L.marker([lat,lng],{icon:makeUserIcon(),zIndexOffset:1000}).addTo(map);
+  userMarker.bindTooltip('📍 Tú estás aquí',{permanent:false,direction:'top'});
+}
+function goToUser(){
+  if(S.userLat){map.flyTo([S.userLat,S.userLng],15,{animate:true,duration:1});showToast('📍','Centrado en tu posición','');}
+  else{showToast('⚠️','Activando GPS…','Permite acceso a tu ubicación.');initGeo();}
+}
+
+function renderStats(){
+  const r=S.reportes;
+  document.getElementById('sn-t').textContent=r.length;
+  document.getElementById('sn-p').textContent=r.filter(x=>!x.res).length;
+  document.getElementById('sn-r').textContent=r.filter(x=>x.res).length;
+  document.getElementById('sn-c').textContent=r.filter(x=>x.sev==='Alto'&&!x.res).length;
+}
+function renderCats(){
+  const cnt={};S.reportes.forEach(r=>{cnt[r.tipo]=(cnt[r.tipo]||0)+1;});
+  document.getElementById('cat-list').innerHTML=TIPOS.map(t=>`
+    <div class="cat-row ${S.filterCat===t.id?'on':''}" onclick="filterCat('${t.id}')">
+      <div class="cat-l"><div class="cat-ico" style="background:${t.bg}">${t.ico}</div><span class="cat-nm">${t.name}</span></div>
+      <span class="cat-cn">${cnt[t.id]||0}</span>
+    </div>`).join('');
+}
+function renderList(){
+  const list=S.filterCat?S.reportes.filter(r=>r.tipo===S.filterCat):S.reportes;
+  if(!list.length){document.getElementById('rep-list').innerHTML='<div style="text-align:center;padding:36px 18px;color:var(--text3)"><div style="width:48px;height:48px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 14px">📭</div><div style="font-size:.77rem;line-height:1.65;font-weight:500">Aún no hay reportes.<br/><span style="color:var(--text2)">¡Sé el primero en reportar!</span></div></div>';return;}
+  document.getElementById('rep-list').innerHTML=list.slice(0,25).map(r=>{
+    const t=TIPOS.find(x=>x.id===r.tipo)||TIPOS[7];
+    return`<div class="rep-card ${S.selId===r.id?'sel':''}" onclick="selectReport(${r.id})">
+      <div class="rc-top"><div class="rc-tipo">${t.ico} ${t.name}${r.nuevo?'<span class="new-chip">NEW</span>':''}</div><span class="sev sev-${r.sev}">${r.sev}</span></div>
+      <div class="rc-desc">${r.desc}</div>
+      <div class="rc-meta"><span>⏱ ${r.hora}</span><span>📍 ${r.lat.toFixed(3)},${r.lng.toFixed(3)}</span>${r.res?'<span style="color:var(--green)">✓</span>':''}</div>
+    </div>`;
+  }).join('');
+}
+function renderActivity(){
+  document.getElementById('act-feed').innerHTML=[...S.reportes].reverse().slice(0,18).map(r=>{
+    const t=TIPOS.find(x=>x.id===r.tipo)||TIPOS[7];
+    const bg={Alto:'rgba(255,68,68,.1)',Medio:'rgba(234,179,8,.1)',Bajo:'rgba(34,197,94,.1)'}[r.sev];
+    return`<div class="act-item"><div class="act-ico" style="background:${bg}">${t.ico}</div>
+      <div class="act-body"><div class="act-t">${t.name} — ${r.sev}</div>
+      <div class="act-s">${r.desc.slice(0,60)}${r.desc.length>60?'…':''}</div>
+      <div class="act-time">Hoy ${r.hora} · ${r.lat.toFixed(3)}, ${r.lng.toFixed(3)}</div></div></div>`;
+  }).join('');
+}
+function renderHeat(){
+  const cnt={};TIPOS.forEach(t=>{cnt[t.id]={n:0}});
+  S.reportes.forEach(r=>{if(cnt[r.tipo])cnt[r.tipo].n++;});
+  const total=S.reportes.length||1;
+  document.getElementById('heat-list').innerHTML=TIPOS.filter(t=>cnt[t.id].n>0)
+    .sort((a,b)=>cnt[b.id].n-cnt[a.id].n).map(t=>{
+      const pct=Math.round(cnt[t.id].n/total*100);
+      return`<div class="hbr"><div class="hbr-top"><span>${t.ico} ${t.name}</span><span class="hbr-pct">${cnt[t.id].n} · ${pct}%</span></div>
+        <div class="hbr-track"><div class="hbr-fill" style="width:${pct}%;background:${t.color}"></div></div></div>`;
+    }).join('');
+}
+function renderAll(){renderStats();renderCats();renderList();renderActivity();}
+
+function selectReport(id){
+  S.selId=id;const r=S.reportes.find(x=>x.id===id);if(!r)return;
+  const t=TIPOS.find(x=>x.id===r.tipo)||TIPOS[7];
+
+  const html=`
+    <div class="det-card">
+      <div class="det-head"><div class="det-tipo">${t.ico} ${t.name}</div><span class="sev sev-${r.sev}">${r.sev}</span></div>
+      ${r.foto?`<img src="${r.foto}" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-bottom:12px;border:1px solid var(--b2)"/>`:
+        `<div style="width:100%;height:100px;background:var(--s3);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:.75rem;color:var(--t3);margin-bottom:12px">📷 Sin foto</div>`}
+      <div class="det-desc">${r.desc}</div>
+      <div class="det-grid">
+        <div class="det-row"><div class="dl">Hora</div><div class="dv">${r.hora}</div></div>
+        <div class="det-row"><div class="dl">Estado</div><div class="dv" style="color:${r.res?'var(--gr)':'var(--yw)'}">${r.res?'✓ Resuelto':'⏳ Pendiente'}</div></div>
+        <div class="det-row"><div class="dl">ID</div><div class="dv">#${r.id}</div></div>
+        <div class="det-row"><div class="dl">Confirmaciones</div><div class="dv">${r.conf||1}</div></div>
+      </div>
+      <div class="det-coords">📍 ${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}</div>
+      <div class="det-actions">
+        ${r.confirmado ? '' : `<button class="det-btn det-confirm" onclick="confirmRep(${r.id})">👍 Confirmar</button>`}
+        <button class="det-btn det-share" onclick="shareRep(${r.id})">🔗 Compartir</button>
+      </div>
+    </div>`;
+
+  // Desktop: update right panel
+  document.getElementById('det-content').innerHTML=html;
+  setTabById('det');
+
+  // Mobile: show full overlay
+  let mob=document.getElementById('mob-detail');
+  if(!mob){
+    mob=document.createElement('div');
+    mob.id='mob-detail';
+    mob.style.cssText='position:fixed;top:58px;left:0;right:0;bottom:0;z-index:800;display:flex;flex-direction:column;background:rgba(6,8,16,.95);backdrop-filter:blur(8px);animation:mIn .3s cubic-bezier(.4,0,.2,1)';
+    document.body.appendChild(mob);
+  }
+  mob.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border2);flex-shrink:0;background:var(--surface)">
+      <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800">Detalle <span style="color:var(--accent)">Reporte</span></div>
+      <button onclick="document.getElementById('mob-detail').remove()" style="width:34px;height:34px;border-radius:8px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer">×</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:14px">
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700">${t.ico} ${t.name}</div>
+          <span class="sev sev-${r.sev}">${r.sev}</span>
+        </div>
+        ${r.foto
+          ?`<img src="${r.foto}" style="width:100%;max-height:260px;object-fit:cover;border-radius:10px;margin-bottom:14px;border:1px solid var(--border2)"/>`
+          :`<div style="width:100%;height:90px;background:var(--surface3);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:.75rem;color:var(--text3);margin-bottom:14px">📷 Sin foto adjunta</div>`
+        }
+        <div style="font-size:.82rem;color:var(--text2);line-height:1.6;margin-bottom:14px">${r.desc}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div style="background:var(--surface3);border-radius:8px;padding:9px 11px"><div style="font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.9px;margin-bottom:2px">Hora</div><div style="font-size:.78rem;font-weight:600">${r.hora}</div></div>
+          <div style="background:var(--surface3);border-radius:8px;padding:9px 11px"><div style="font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.9px;margin-bottom:2px">Estado</div><div style="font-size:.78rem;font-weight:600;color:${r.res?'#22c55e':'#f0b429'}">${r.res?'✓ Resuelto':'⏳ Pendiente'}</div></div>
+          <div style="background:var(--surface3);border-radius:8px;padding:9px 11px"><div style="font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.9px;margin-bottom:2px">ID Reporte</div><div style="font-size:.78rem;font-weight:600">#${r.id}</div></div>
+          <div style="background:var(--surface3);border-radius:8px;padding:9px 11px"><div style="font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.9px;margin-bottom:2px">Confirmaciones</div><div style="font-size:.78rem;font-weight:600">${r.conf||1}</div></div>
+        </div>
+        <div style="font-family:monospace;font-size:.7rem;color:var(--blue);margin-bottom:14px;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.15);border-radius:6px;padding:7px 10px">📍 ${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          ${r.confirmado ? '' : `<button onclick="confirmRep(${r.id})" style="flex:1;padding:11px;border-radius:9px;background:rgba(34,197,94,.1);color:#22c55e;border:1px solid rgba(34,197,94,.2);font-size:.78rem;font-weight:600;font-family:inherit;cursor:pointer">👍 Confirmar</button>`}
+          <button onclick="shareRep(${r.id})" style="flex:1;padding:11px;border-radius:9px;background:var(--surface3);color:var(--text2);border:1px solid var(--border2);font-size:.78rem;font-weight:600;font-family:inherit;cursor:pointer">🔗 Compartir</button>
+        </div>
+        <button onclick="this.style.background='rgba(255,59,59,.15)';this.style.color='var(--accent)';this.style.borderColor='rgba(255,59,59,.3)';setTimeout(()=>document.getElementById('mob-detail').remove(),180)" style="width:100%;padding:12px;border-radius:9px;background:var(--surface3);color:var(--text2);border:1px solid var(--border2);font-size:.8rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all .18s">✕ Cerrar</button>
+      </div>
+    </div>`;
+  mob.style.display='flex';
+
+  if(map)map.flyTo([r.lat,r.lng],16,{animate:true,duration:.9});
+  renderList();
+}
+function confirmRep(id){const r=S.reportes.find(x=>x.id===id);if(r){r.conf=(r.conf||1)+1;r.confirmado=true;selectReport(id);}showToast('👍','Confirmado','Gracias por verificar.');}
+function shareRep(id){navigator.clipboard?.writeText(`CiudadAlerta Reporte #${id}`);showToast('🔗','Copiado','Enlace en portapapeles.');}
+function filterCat(cat){S.filterCat=S.filterCat===cat?null:cat;renderAll();plotMarkers();}
+
+// MODAL
+function buildTipoGrid(){
+  document.getElementById('tipo-grid').innerHTML=TIPOS.map(t=>`
+    <div class="tc" onclick="selTipo(this,'${t.id}')"><span class="ti">${t.ico}</span><span class="tn">${t.name}</span></div>`).join('');
+  document.getElementById('steps-bar').innerHTML=[1,2,3].map(i=>`<div class="sd" id="sd${i}"></div>`).join('');
+  updateDots(1);
+}
+function selTipo(el,id){document.querySelectorAll('.tc').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');S.formTipo=id;document.getElementById('btn-s1').disabled=false;}
+function selSev(el,sev){document.querySelectorAll('.so').forEach(s=>s.classList.remove('sel'));el.classList.add('sel');S.formSev=sev;}
+function updateDots(cur){[1,2,3].forEach(i=>{const d=document.getElementById('sd'+i);if(!d)return;d.className='sd';if(i<cur)d.classList.add('done');if(i===cur)d.classList.add('cur');});}
+function goStep(n){
+  document.getElementById('fs'+curStep).classList.remove('show');curStep=n;
+  document.getElementById('fs'+n).classList.add('show');updateDots(n);
+  if(n===3)startModalGeo();
+}
+function startModalGeo(){
+  const dot=document.getElementById('lp-dot'),txt=document.getElementById('lp-txt'),crd=document.getElementById('lp-coords');
+  if(S.userLat){dot.classList.add('on');txt.textContent='Ubicación GPS activa ✓';crd.textContent=`${S.userLat.toFixed(6)}, ${S.userLng.toFixed(6)}`;return;}
+  if(!navigator.geolocation){txt.textContent='GPS no disponible';return;}
+  txt.textContent='Obteniendo señal GPS…';
+  navigator.geolocation.getCurrentPosition(p=>{
+    S.userLat=p.coords.latitude;S.userLng=p.coords.longitude;
+    dot.classList.add('on');txt.textContent='Ubicación GPS activa ✓';crd.textContent=`${S.userLat.toFixed(6)}, ${S.userLng.toFixed(6)}`;
+    document.getElementById('loc-ind').classList.add('on');
+    if(map)placeUser(S.userLat,S.userLng);
+  },()=>{txt.textContent='No se pudo obtener GPS — se usará posición aproximada.';});
+}
+function openModal(){
+  curStep=1;S.formTipo=null;
+  document.querySelectorAll('.form-step').forEach(s=>s.classList.remove('show'));
+  document.getElementById('fs1').classList.add('show');
+  document.querySelectorAll('.tc').forEach(c=>c.classList.remove('sel'));
+  document.getElementById('btn-s1').disabled=true;
+  document.querySelectorAll('.so').forEach(s=>s.classList.remove('sel'));
+  document.querySelector('.so.s-Medio').classList.add('sel');S.formSev='Medio';
+  document.getElementById('f-desc').value='';document.getElementById('f-dir').value='';
+  updateDots(1);document.getElementById('overlay').classList.add('open');
+}
+function closeModal(){document.getElementById('overlay').classList.remove('open');}
+document.getElementById('overlay').addEventListener('click',e=>{if(e.target===document.getElementById('overlay'))closeModal();});
+
+function loadFoto(input){
+  if(!input.files||!input.files[0])return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    S.formFoto=e.target.result;
+    document.getElementById('foto-img').src=e.target.result;
+    document.getElementById('foto-preview').style.display='block';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+async function submitReport(){
+  const bLat=S.userLat||BL,bLng=S.userLng||BLN;
+  const tipo=S.formTipo||'otro';
+  const emp=getEmpresa(tipo,bLat,bLng);
+  const TIPO_CAT={bache:1,alumbrado:2,derrumbe:3,inundacion:4,arbol:5,semaforo:6,basura:7,otro:8};
+  const SEV_PRIO={Bajo:1,Medio:2,Alto:3};
+  const desc=document.getElementById('f-desc').value.trim()||'Sin descripción.';
+  const dir=document.getElementById('f-dir').value||'';
+
+  // Guardar en la base de datos si hay token
+  let dbId = null;
+  const token = getToken();
+  if(token && token !== 'demo_token'){
+    try{
+      const res = await fetch(`${API}/api/reportes`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body:JSON.stringify({
+          titulo: emp.nombre.split('—')[0].trim(),
+          descripcion: desc,
+          latitud: bLat,
+          longitud: bLng,
+          direccion: dir,
+          id_categoria: TIPO_CAT[tipo]||8,
+          id_prioridad: SEV_PRIO[S.formSev]||2,
+          id_entidad: emp.id||null
+        })
+      });
+      const data = await res.json();
+      if(res.ok) dbId = data.id_reporte;
+    }catch(e){ console.warn('Sin conexión al servidor, guardando local'); }
+  }
+
+  const r={id:dbId||Date.now(),tipo,
+    desc, sev:S.formSev,
+    lat:bLat,lng:bLng,
+    hora:new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}),
+    res:false,nuevo:true,conf:1,dir,
+    foto:S.formFoto||null,
+    empresa:emp};
+  S.formFoto=null;
+  document.getElementById('foto-preview').style.display='none';
+  S.reportes.unshift(r);
+  document.getElementById('rep-id-val').textContent=`ID Reporte: #${r.id}`;
+  const empBadge=document.getElementById('emp-badge');
+  if(empBadge){empBadge.innerHTML=`
+    <div style="margin-top:14px;background:rgba(255,255,255,.04);border:1px solid ${emp.color}33;border-radius:10px;padding:12px 14px;text-align:left">
+      <div style="font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">📨 Reporte enviado a</div>
+      <div style="display:flex;align-items:center;gap:9px">
+        <div style="width:34px;height:34px;border-radius:8px;background:${emp.color}22;border:1px solid ${emp.color}55;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${emp.ico}</div>
+        <div>
+          <div style="font-size:.82rem;font-weight:600;color:var(--text)">${emp.nombre}</div>
+          <div style="font-size:.68rem;color:var(--green);margin-top:2px">✓ ${dbId?'Guardado en base de datos':'Guardado localmente'}</div>
+        </div>
+      </div>
+    </div>`;}
+  goStep(4);plotMarkers();renderAll();
+  if(map){map.flyTo([r.lat,r.lng],16,{animate:true,duration:1});
+    setTimeout(()=>{const m=repMarkers[0];if(m)m.openPopup();},1300);}
+  setTimeout(()=>{r.nuevo=false;},6000);
+  showToast(emp.ico,`Enviado a ${emp.nombre.split(' (')[0]}`,'Notificación enviada ✓');
+}
+
+function setTab(btn,id){
+  document.querySelectorAll('.ptab').forEach(t=>t.classList.remove('on'));btn.classList.add('on');
+  document.querySelectorAll('#panel .panel-body > div').forEach(d=>d.style.display='none');
+  document.getElementById('tab-'+id).style.display='block';
+  if(id==='heat')renderHeat();if(id==='act')renderActivity();
+}
+function setTabById(id){
+  const tabs=['act','det','heat'];
+  document.querySelectorAll('.ptab').forEach((t,i)=>t.classList.toggle('on',tabs[i]===id));
+  document.querySelectorAll('#panel .panel-body > div').forEach(d=>d.style.display='none');
+  document.getElementById('tab-'+id).style.display='block';
+}
+
+function showToast(ico,title,sub){
+  const c=document.getElementById('toasts'),t=document.createElement('div');
+  t.className='toast';t.innerHTML=`<span class="toast-ico">${ico}</span><div><div class="toast-t">${title}</div>${sub?`<div class="toast-s">${sub}</div>`:''}</div>`;
+  c.appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(18px)';setTimeout(()=>t.remove(),300);},3800);
+}
+
+
+// ── API BASE URL ─────────────────────────────────────────
+// En Railway cambia esto por tu URL real, ej: https://ciudadalerta.up.railway.app
+const API = window.location.origin;
+
+// ── AUTH STATE ────────────────────────────────────────────
+let currentUser = null;
+let authToken   = null;
+
+function getToken(){ return localStorage.getItem('ca_token'); }
+function getUser() { try{ return JSON.parse(localStorage.getItem('ca_user')); }catch{ return null; } }
+
+function saveSession(token, usuario){
+  localStorage.setItem('ca_token', token);
+  localStorage.setItem('ca_user', JSON.stringify(usuario));
+  authToken   = token;
+  currentUser = usuario;
+}
+function clearSession(){
+  localStorage.removeItem('ca_token');
+  localStorage.removeItem('ca_user');
+  authToken = null; currentUser = null;
+}
+
+function switchAuthTab(tab){
+  document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('on', (tab==='login'?i===0:i===1)));
+  document.getElementById('form-login').classList.toggle('show', tab==='login');
+  document.getElementById('form-registro').classList.toggle('show', tab==='registro');
+}
+
+async function doLogin(){
+  const email = document.getElementById('l-email').value.trim();
+  const pass  = document.getElementById('l-pass').value;
+  const errEl = document.getElementById('l-err');
+  const btn   = document.getElementById('l-btn');
+  errEl.classList.remove('show');
+  if(!email||!pass){ document.getElementById('l-err-txt').textContent='Completa todos los campos.'; errEl.classList.add('show'); return; }
+  btn.disabled=true; btn.textContent='Ingresando…';
+  try {
+    const res  = await fetch(`${API}/api/auth/login`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email, contrasena: pass })
+    });
+    const data = await res.json();
+    if(!res.ok){ document.getElementById('l-err-txt').textContent = data.error || 'Error al iniciar sesión'; errEl.classList.add('show'); return; }
+    saveSession(data.token, data.usuario);
+    enterApp();
+  } catch(e){
+    // MODO DEMO: si no hay backend, entramos igual
+    saveSession('demo_token', { nombre: email.split('@')[0], email, rol:'ciudadano' });
+    enterApp();
+  } finally { btn.disabled=false; btn.textContent='Entrar →'; }
+}
+
+async function doRegistro(){
+  const nombre   = document.getElementById('r-nombre').value.trim();
+  const apellido = document.getElementById('r-apellido').value.trim();
+  const email    = document.getElementById('r-email').value.trim();
+  const tel      = document.getElementById('r-tel').value.trim();
+  const pass     = document.getElementById('r-pass').value;
+  const errEl    = document.getElementById('r-err');
+  const btn      = document.getElementById('r-btn');
+  errEl.classList.remove('show');
+  if(!nombre||!email||!pass){ document.getElementById('r-err-txt').textContent='Nombre, email y contraseña son obligatorios.'; errEl.classList.add('show'); return; }
+  if(pass.length<6){ document.getElementById('r-err-txt').textContent='La contraseña debe tener al menos 6 caracteres.'; errEl.classList.add('show'); return; }
+  btn.disabled=true; btn.textContent='Creando cuenta…';
+  try {
+    const res  = await fetch(`${API}/api/auth/registro`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ nombre, apellido, email, contrasena: pass, telefono: tel })
+    });
+    const data = await res.json();
+    if(!res.ok){ document.getElementById('r-err-txt').textContent = data.error || 'Error al registrarse'; errEl.classList.add('show'); return; }
+    saveSession(data.token, data.usuario);
+    enterApp();
+  } catch(e){
+    // MODO DEMO
+    saveSession('demo_token', { nombre, email, rol:'ciudadano' });
+    enterApp();
+  } finally { btn.disabled=false; btn.textContent='Crear cuenta →'; }
+}
+
+function doLogout(){
+  clearSession();
+  document.getElementById('auth-screen').classList.add('show');
+  document.getElementById('user-name').textContent='';
+  document.getElementById('user-avatar').textContent='CA';
+  showToast('👋','Sesión cerrada','¡Hasta pronto!');
+}
+
+async function loadReportesFromDB(){
+  const token = getToken();
+  if(!token || token==='demo_token') return;
+  try{
+    const res = await fetch(`${API}/api/reportes?limite=200`,{
+      headers:{'Authorization':'Bearer '+token}
+    });
+    if(!res.ok) return;
+    const data = await res.json();
+    const TIPOS_MAP = {1:'bache',2:'alumbrado',3:'derrumbe',4:'inundacion',5:'arbol',6:'semaforo',7:'basura',8:'otro'};
+    const SEV_MAP = {1:'Bajo',2:'Medio',3:'Alto'};
+    // Convertir formato DB → formato app
+    const mapped = data.map(r=>({
+      id: r.id_reporte,
+      tipo: TIPOS_MAP[r.id_categoria]||'otro',
+      desc: r.descripcion||'Sin descripción.',
+      sev: SEV_MAP[r.id_prioridad]||'Medio',
+      lat: parseFloat(r.latitud),
+      lng: parseFloat(r.longitud),
+      hora: new Date(r.fecha_reporte).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}),
+      res: r.estado==='resuelto',
+      nuevo: false,
+      conf: r.confirmaciones||1,
+      dir: r.direccion||'',
+      foto: r.foto_url||null,
+      empresa: getEmpresa(TIPOS_MAP[r.id_categoria]||'otro', parseFloat(r.latitud), parseFloat(r.longitud))
+    }));
+    S.reportes = mapped;
+    renderAll();
+    plotMarkers();
+    showToast('📋','Reportes cargados',`${mapped.length} reportes en tu zona`);
+  }catch(e){ console.warn('No se pudieron cargar reportes:', e); }
+}
+
+function enterApp(){
+  document.getElementById('auth-screen').classList.remove('show');
+  const u = currentUser || getUser();
+  if(u){
+    const initials = (u.nombre||'C').charAt(0).toUpperCase();
+    document.getElementById('user-avatar').textContent = initials;
+    document.getElementById('user-name').textContent   = u.nombre;
+  }
+  showToast('👋','¡Bienvenido!', (currentUser||{}).nombre || '');
+  buildTipoGrid();
+  initGeo();
+  // Cargar reportes de la BD después de un momento
+  setTimeout(loadReportesFromDB, 1500);
+}
+
+// ── Vistas (Dashboard / Mi Zona) ─────────────────────────
+function showView(id, btn){
+  // Ocultar mapa-área y vistas
+  document.getElementById('map-wrap').style.display = id==='mapa' ? '' : 'none';
+  const dash = document.getElementById('view-dashboard');
+  const zona = document.getElementById('view-zona');
+  if(dash) dash.style.display = id==='dashboard' ? 'block' : 'none';
+  if(zona) zona.style.display = id==='zona'      ? 'block' : 'none';
+
+  // Actualizar tab activo
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+
+  // Poblar datos si corresponde
+  if(id==='dashboard'){
+    const u = currentUser||getUser()||{};
+    const reps = (window.S&&S.reportes)||[];
+    document.getElementById('d-total').textContent = reps.length;
+    document.getElementById('d-pend').textContent  = reps.filter(r=>!r.res).length;
+    document.getElementById('d-res').textContent   = reps.filter(r=>r.res).length;
+    document.getElementById('d-crit').textContent  = reps.filter(r=>r.sev==='Alto').length;
+  }
+  if(id==='zona'){
+    const u = currentUser||getUser()||{};
+    const reps = (window.S&&S.reportes)||[];
+    document.getElementById('z-nombre').textContent  = u.nombre||'—';
+    document.getElementById('z-email').textContent   = u.email||'—';
+    document.getElementById('z-reportes').textContent = reps.length;
+    const lat = window.S&&S.userLat;
+    const lng = window.S&&S.userLng;
+    document.getElementById('z-coords').textContent  = lat ? lat.toFixed(5)+', '+lng.toFixed(5) : 'Sin GPS';
+    document.getElementById('z-ciudad').textContent  = lat ? getCiudad(lat,lng)||'Ciudad no detectada' : 'Detectando…';
+  }
+}
+
+// ── Arrancar ──────────────────────────────────────────────
+(function init(){
+  const token = getToken();
+  const user  = getUser();
+  if(token && user){
+    authToken   = token;
+    currentUser = user;
+    enterApp();
+  } else {
+    document.getElementById('auth-screen').classList.add('show');
+    // Allow Enter key on login
+    document.getElementById('l-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+    document.getElementById('l-email').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+  }
+})();
+
+</script>
+
+<!-- ── AUTH SCREEN ──────────────────────────────────────── -->
+<div id="auth-screen" class="show">
+  <div class="auth-bg"></div>
+  <div class="auth-box">
+    <div style="text-align:center;margin-bottom:6px">
+      <div class="auth-badge"><div class="auth-badge-dot"></div>Plataforma Ciudadana</div>
+    </div>
+    <div class="auth-logo">
+      <div class="auth-logo-mark">📍</div>
+      <div class="auth-logo-name">Ciudad<span>Alerta</span></div>
+    </div>
+    <div class="auth-subtitle">Reporta daños urbanos en tu ciudad<br/>en tiempo real</div>
+    <div class="auth-tabs">
+      <button class="auth-tab on" onclick="switchAuthTab('login')">Iniciar sesión</button>
+      <button class="auth-tab" onclick="switchAuthTab('registro')">Registrarse</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div class="auth-form show" id="form-login">
+      <label class="auth-label">📧 Correo electrónico</label>
+      <input class="auth-input" id="l-email" type="email" placeholder="tucorreo@gmail.com" autocomplete="email"/>
+      <label class="auth-label">🔒 Contraseña</label>
+      <input class="auth-input" id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password"/>
+      <div class="auth-err" id="l-err">⚠️ <span id="l-err-txt"></span></div>
+      <button class="auth-btn" id="l-btn" onclick="doLogin()">Entrar →</button>
+      <div class="auth-footer">¿No tienes cuenta? <a href="#" onclick="switchAuthTab('registro')" style="color:var(--accent);text-decoration:none;font-weight:700">Regístrate gratis</a></div>
+    </div>
+
+    <!-- REGISTRO -->
+    <div class="auth-form" id="form-registro">
+      <div class="auth-row">
+        <div>
+          <label class="auth-label">👤 Nombre</label>
+          <input class="auth-input" id="r-nombre" type="text" placeholder="Juan"/>
+        </div>
+        <div>
+          <label class="auth-label">👤 Apellido</label>
+          <input class="auth-input" id="r-apellido" type="text" placeholder="Pérez"/>
+        </div>
+      </div>
+      <label class="auth-label">📧 Correo electrónico</label>
+      <input class="auth-input" id="r-email" type="email" placeholder="tucorreo@gmail.com"/>
+      <label class="auth-label">📱 Teléfono (opcional)</label>
+      <input class="auth-input" id="r-tel" type="tel" placeholder="+57 300 000 0000"/>
+      <label class="auth-label">🔒 Contraseña</label>
+      <input class="auth-input" id="r-pass" type="password" placeholder="Mínimo 6 caracteres"/>
+      <div class="auth-err" id="r-err">⚠️ <span id="r-err-txt"></span></div>
+      <button class="auth-btn" id="r-btn" onclick="doRegistro()">Crear cuenta →</button>
+      <div class="auth-footer">¿Ya tienes cuenta? <a href="#" onclick="switchAuthTab('login')" style="color:var(--accent);text-decoration:none;font-weight:700">Inicia sesión</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── DASHBOARD VIEW ────────────────────────────────── -->
+<div id="view-dashboard">
+  <div class="dash-title">📊 Dashboard</div>
+  <div class="dash-grid">
+    <div class="dash-card"><div class="big cr" id="d-total">0</div><div class="lbl">Total Reportes</div></div>
+    <div class="dash-card"><div class="big cy" id="d-pend">0</div><div class="lbl">Pendientes</div></div>
+    <div class="dash-card"><div class="big cg" id="d-res">0</div><div class="lbl">Resueltos</div></div>
+    <div class="dash-card"><div class="big cb" id="d-crit">0</div><div class="lbl">Críticos</div></div>
+  </div>
+  <div style="text-align:center;margin-top:10px">
+    <button onclick="showView('mapa',document.getElementById('nav-mapa'))" style="padding:12px 28px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:.85rem;font-weight:700;cursor:pointer">← Volver al Mapa</button>
+  </div>
+</div>
+
+<!-- ── MI ZONA VIEW ──────────────────────────────────── -->
+<div id="view-zona">
+  <div class="dash-title">📍 Mi Zona</div>
+  <div class="zona-info">
+    <div class="zona-row"><span class="zona-lbl">Usuario</span><span class="zona-val" id="z-nombre">—</span></div>
+    <div class="zona-row"><span class="zona-lbl">Correo</span><span class="zona-val" id="z-email">—</span></div>
+    <div class="zona-row"><span class="zona-lbl">Mis reportes</span><span class="zona-val cr" id="z-reportes">0</span></div>
+    <div class="zona-row"><span class="zona-lbl">Coordenadas GPS</span><span class="zona-val cb" id="z-coords">Sin GPS</span></div>
+    <div class="zona-row"><span class="zona-lbl">Ciudad detectada</span><span class="zona-val" id="z-ciudad">Detectando…</span></div>
+  </div>
+  <div style="text-align:center;margin-top:20px;display:flex;gap:10px;justify-content:center">
+    <button onclick="showView('mapa',document.getElementById('nav-mapa'))" style="padding:12px 24px;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer">← Volver al Mapa</button>
+    <button onclick="doLogout()" style="padding:12px 24px;background:rgba(255,59,59,.1);color:var(--accent);border:1px solid rgba(255,59,59,.2);border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer">Cerrar sesión</button>
+  </div>
+</div>
+
+</body>
+</html>
